@@ -13,8 +13,12 @@ from .machine_profile import MACH3TURN_XHC_MKX_ET, MachineProfile
 SEVERITIES = ("INFO", "WARNING", "ERROR", "FATAL")
 BLOCKING_SEVERITIES = frozenset({"ERROR", "FATAL"})
 MOTION_CODES = frozenset({0, 1, 2, 3})
-AXIS_WORD_RE = re.compile(r"\b([XZUW])([-+]?\d*\.?\d+)\b", re.IGNORECASE)
-WORD_RE = re.compile(r"\b[A-Z][-+]?\d*\.?\d+\b", re.IGNORECASE)
+NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
+# G-code words are allowed to touch: X0.37Z-8.5F300 is valid lexical input.
+# Therefore these expressions intentionally do not require word boundaries
+# between an address value and the following address letter.
+AXIS_WORD_RE = re.compile(rf"([XZUW])({NUMBER})", re.IGNORECASE)
+WORD_RE = re.compile(rf"[A-Z]{NUMBER}", re.IGNORECASE)
 ORPHAN_NUMBER_RE = re.compile(r"(?<![A-Z])(?<![\d.])[-+]?\d+(?:\.\d*)?(?![\d.])", re.IGNORECASE)
 
 
@@ -36,13 +40,13 @@ def _finding(line: int, rule: str, message: str, severity: str) -> Dict:
 
 
 def _g_codes(code_line: str) -> List[int]:
-    return [int(value) for value in re.findall(r"\bG0*(\d+)\b", code_line, re.IGNORECASE)]
+    return [int(value) for value in re.findall(r"G0*(\d+)", code_line, re.IGNORECASE)]
 
 
 def _orphan_numbers(code_line: str) -> List[str]:
     """Return numeric literals that are not attached to a G-code address word.
 
-    ``G0 10.`` therefore returns ``["10."]`` while ``G0 X10.`` and
+    ``G0 10.`` therefore returns ``["10."]`` while ``G0 X10.``, ``G0X10.`` and
     ``G0 T0101`` return an empty list.  Program numbers such as ``O001`` and
     sequence numbers such as ``N10`` are normal address words and are removed.
     """
@@ -82,17 +86,16 @@ def validate_mach3turn(
 
         # A number with no address letter in an explicit motion block is never
         # repaired automatically.  It is exactly the dangerous `G0 10.` class.
-        if explicit_motion is not None:
-            orphan_numbers = _orphan_numbers(line)
-            if orphan_numbers:
-                values = ", ".join(orphan_numbers)
-                findings.append(_finding(
-                    line_num,
-                    "M3T-SYNTAX-001",
-                    f"Ambiguous motion block contains number(s) without an address: {values}. "
-                    "Specify X/Z explicitly; the validator will not guess.",
-                    "FATAL",
-                ))
+        orphan_numbers = _orphan_numbers(line) if explicit_motion is not None else []
+        if orphan_numbers:
+            values = ", ".join(orphan_numbers)
+            findings.append(_finding(
+                line_num,
+                "M3T-SYNTAX-001",
+                f"Ambiguous motion block contains number(s) without an address: {values}. "
+                "Specify X/Z explicitly; the validator will not guess.",
+                "FATAL",
+            ))
 
         # Update modal groups in block order.  The last code from a modal group
         # on one block wins, matching how the rest of the simulator treats G-codes.
@@ -112,10 +115,10 @@ def validate_mach3turn(
 
         # `G0 T0101` is not silently treated as a move.  It is suspicious but
         # not the same as the malformed orphan-number case above.
-        if explicit_motion is not None and not has_axis and not _orphan_numbers(line):
+        if explicit_motion is not None and not has_axis and not orphan_numbers:
             # G02/G03 can describe a full circle with centre/radius words and no
             # X/Z end point, so do not flag those as axisless here.
-            has_arc_geometry = bool(re.search(r"\b[IKR][-+]?\d*\.?\d+\b", line, re.IGNORECASE))
+            has_arc_geometry = bool(re.search(rf"[IKR]{NUMBER}", line, re.IGNORECASE))
             if explicit_motion in (0, 1) or not has_arc_geometry:
                 findings.append(_finding(
                     line_num,
