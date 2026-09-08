@@ -24,6 +24,21 @@ class Mach3TurnValidatorTests(unittest.TestCase):
         self.assertEqual(findings, [])
         self.assertFalse(blocks_export(findings))
 
+    def test_compact_words_without_spaces_are_valid(self):
+        code = "G21G18G90G94\nG0X60.Z10.\nG1X45.Z-20.F300\nM30"
+
+        findings = validate_mach3turn(code)
+
+        self.assertEqual(findings, [])
+        self.assertFalse(blocks_export(findings))
+
+    def test_real_style_z_and_feed_can_touch(self):
+        code = "G21 G18 G90 G94\nG0 X5. Z0.\nG1 Z-8.5F300"
+
+        findings = validate_mach3turn(code)
+
+        self.assertEqual(findings, [])
+
     def test_g0_orphan_number_is_fatal_and_never_guessed(self):
         code = "G21 G18 G90 G94\nG0 X60. Z0.\nG0 10.\nM30"
 
