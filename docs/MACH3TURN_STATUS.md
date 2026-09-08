@@ -6,6 +6,8 @@
 **Updated:** 2026-09-08
 
 > Đây là bảng trạng thái vận hành ngắn gọn. Kế hoạch dài hạn vẫn nằm ở `docs/MACH3TURN_IMPLEMENTATION_PLAN.md`.
+>
+> **Chính sách AI đã chỉnh ngày 2026-09-08:** Ollama/local AI **không bị cấm vĩnh viễn**. Máy CNC hiện tại yếu nên local AI mặc định tắt. Khi có máy cấu hình đủ mạnh, người dùng có thể bật `ai.allow_local: true` và chọn `mode: ollama`.
 
 ## Quy ước trạng thái
 
@@ -21,7 +23,7 @@
 | Fork upstream | ✅ XONG | `nguyenvinh1234/vibeCNC` |
 | Branch phát triển | ✅ XONG | `mach3turn`; không sửa trực tiếp `main` |
 | Draft PR quản lý | ✅ XONG | PR #1 `mach3turn -> main` |
-| Không dùng local AI trên máy CNC yếu | ✅ XONG | Kiến trúc dự án đã chốt cloud/subscription only |
+| Local AI trên máy CNC hiện tại | ✅ CHÍNH SÁCH ĐÃ CHỐT | Mặc định tắt vì máy yếu; **không cấm**, có thể bật khi phần cứng đủ mạnh |
 | Machine profile Mach3Turn/XHC | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | `vibe_cnc/machine_profile.py` |
 | Config chọn profile | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | `config.example.yaml`: `MACH3TURN_XHC_MKX_ET`, `x_mode: diameter` |
 
@@ -66,24 +68,24 @@
 | Test chương trình thật | 🟡 | `tests/test_mach3turn_real_programs.py` đã có trong CI |
 | Test SafetyEngine | 🟡 | `tests/test_safety_engine.py` đã có trong CI |
 | Test Mach3Turn → LintEngine integration | 🟡 | `tests/test_mach3turn_lint_integration.py` đã có trong CI |
-| Test cấm local AI production | 🟡 | `tests/test_ai_provider_policy.py`; offline/production Ollama/unknown-provider đều phải không tạo local/network fallback |
+| Test chính sách AI local | 🟡 | `tests/test_ai_provider_policy.py`: mặc định tắt; bật `allow_local=true` thì Ollama được phép; unknown provider không fallback |
 | Workflow chạy trên `mach3turn` push | 🟡 | `ci.yml` đã thêm `mach3turn` vào trigger |
 | GitHub Actions CI PASS | ⬜ CHƯA XONG | GitHub vẫn chưa tạo workflow run/status cho branch; chưa được phép đổi các mục 🟡 thành ✅ |
 | Ruff PASS | ⬜ CHƯA XONG | Chờ GitHub Actions chạy |
 
-## E. AI Cloud / Subscription
+## E. AI Cloud / Subscription / Local tùy chọn
 
 | Hạng mục | Trạng thái | Ghi chú |
 |---|---|---|
-| Hard no-local guard trong `AIClient` | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | `offline: true` dừng ngay; profile production chặn Ollama; unknown mode không còn fallback Ollama |
+| AI mặc định an toàn trên máy hiện tại | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | `offline: true`, `allow_local: false`; không tự chạy AI khi mới cài |
+| Ollama/local AI tùy chọn | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | Không bị cấm theo machine profile; chỉ chạy khi `allow_local: true` và `mode: ollama` |
+| Unknown provider không fallback | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | Không tự rơi sang Ollama khi cấu hình sai |
 | Alias `anthropic`/`claude` → cloud Anthropic | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | Vá lỗi upstream: trước đây mọi mode khác `claude` đều rơi xuống Ollama |
-| AI mặc định production | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | `config.example.yaml` để `offline: true`; không tự gọi AI khi mới cài |
-| AI Provider abstraction | ⬜ CHƯA XONG | Làm sau khi P0 safety core được CI xác nhận |
-| Codex CLI / ChatGPT Plus-Pro | ⬜ CHƯA XONG | Provider ưu tiên số 1 |
+| AI Provider abstraction | ⬜ CHƯA XONG | Cần interface chung cho cloud/subscription/local |
+| Codex CLI / ChatGPT Plus-Pro | ⬜ CHƯA XONG | Provider ưu tiên số 1 trên máy hiện tại |
 | OpenAI API key | ⬜ CHƯA XONG | Key chỉ từ env/credential store; không commit secret |
 | Anthropic API provider chuẩn hóa | ⬜ CHƯA XONG | Client cloud hiện có đã được khóa policy; interface provider chung chưa tách |
-| Ollama/local model production | ⛔ KHÔNG LÀM | Máy CNC yếu; hard guard chặn local AI ở production profile |
-| DeepSeek/OpenRouter | ⬜ P2 | Sau core |
+| OpenRouter/DeepSeek | ⬜ P2 | Sau core |
 
 ## F. Tool/Turret và máy lận
 
@@ -109,3 +111,4 @@
 4. Hiển thị severity rõ trong UI: INFO/WARNING/ERROR/FATAL.
 5. Thêm production Export Gate: ERROR/FATAL = không cho xuất `.tap/.nc`.
 6. Sau khi P0 PASS mới chuyển sang V0.2 tool/turret safety.
+7. Khi làm AI Provider UI, cho phép chọn Cloud / Subscription / Local; local chỉ bị **mặc định tắt** trên máy hiện tại, không bị loại khỏi sản phẩm.
