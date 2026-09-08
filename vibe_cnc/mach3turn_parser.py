@@ -14,6 +14,9 @@ from .gcode_parser import GCodeParser, NON_MOTION_CODES
 from .machine_profile import MACH3TURN_XHC_MKX_ET, MachineProfile
 
 
+NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
+
+
 @dataclass(frozen=True)
 class ModalState:
     plane: Optional[str]
@@ -60,11 +63,12 @@ class Mach3TurnGCodeParser:
 
     @staticmethod
     def _g_codes(line: str) -> List[int]:
-        return [int(value) for value in re.findall(r"\bG0*(\d+)\b", line, re.IGNORECASE)]
+        # G-code words may be adjacent (for example G21G18G90G94).
+        return [int(value) for value in re.findall(r"G0*(\d+)", line, re.IGNORECASE)]
 
     @staticmethod
     def _replace_axis(line: str, axis: str, value: float) -> str:
-        pattern = re.compile(rf"\b{axis}[-+]?\d*\.?\d+", re.IGNORECASE)
+        pattern = re.compile(rf"{axis}{NUMBER}", re.IGNORECASE)
         return pattern.sub(f"{axis}{value:.12g}", line, count=1)
 
     def _snapshot(self) -> ModalState:
@@ -104,12 +108,15 @@ class Mach3TurnGCodeParser:
             # into coordinates would recreate the exact class of false moves the
             # upstream parser carefully avoids.
             if any(g in NON_MOTION_CODES for g in g_codes):
-                out.append(raw_line)
+                out.append(code_line)
                 continue
 
-            x_match = re.search(r"\bX([-+]?\d*\.?\d+)\b", code_line, re.IGNORECASE)
-            z_match = re.search(r"\bZ([-+]?\d*\.?\d+)\b", code_line, re.IGNORECASE)
-            transformed = raw_line
+            x_match = re.search(rf"X({NUMBER})", code_line, re.IGNORECASE)
+            z_match = re.search(rf"Z({NUMBER})", code_line, re.IGNORECASE)
+            # Normalization is parser-only, so comments are intentionally omitted
+            # while line count is preserved.  This prevents an X/Z written inside
+            # a comment from being replaced as if it were executable code.
+            transformed = code_line
 
             if self.distance_mode == "G91":
                 if x_match:
