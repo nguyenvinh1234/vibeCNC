@@ -38,11 +38,10 @@ jobs:
           sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 \
             libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
             libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-cursor0
-      - name: Run tests that need PyQt6
+      - name: Run tests that need runtime dependencies
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m unittest tests.test_tool_model tests.test_arc_rendering tests.test_ai_worker tests.test_plot_orientation tests.test_macro_model
-          tests.test_settings_manager -v
+        run: python -m unittest tests.test_ai_provider_policy tests.test_tool_model tests.test_arc_rendering tests.test_ai_worker tests.test_plot_orientation tests.test_macro_model tests.test_settings_manager -v
 
   # Dead imports and unused variables grew back once already, so the gate is in
   # CI rather than in a habit. F covers pyflakes (unused, undefined, redefined),
