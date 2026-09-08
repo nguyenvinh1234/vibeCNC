@@ -24,6 +24,12 @@ paths:
   sim_share: \\linuxcnc-vm\sim\incoming
 
 machine:
+  # Safety profile for the Ngoc Viet Mach3Turn lathe with XHC MKX-ET.
+  # This profile is declarative only: vibeCNC does NOT call NcEther.dll or I/O.
+  profile: MACH3TURN_XHC_MKX_ET
+  dialect: mach3turn
+  x_mode: diameter
+
   # Z of the chuck face. Anything behind it is inside the chuck.
   chuck_z_limit: -100.0
 
@@ -52,8 +58,9 @@ policies:
   require_origin: G54
 
 ai:
-  # 'ollama' or 'anthropic'. Set offline: true to run with no backend at all —
-  # editor, plotter, simulation, lint engine and the libraries all work without.
+  # Upstream values remain documented for compatibility, but the Mach3Turn
+  # production plan does not run local/Ollama AI on the CNC PC.  The provider
+  # layer will replace this selector in V0.3 with Codex subscription/API cloud.
   mode: ollama
   offline: false
   anthropic:
