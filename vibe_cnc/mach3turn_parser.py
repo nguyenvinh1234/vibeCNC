@@ -104,35 +104,50 @@ class Mach3TurnGCodeParser:
 
             self.modal_history[line_num] = self._snapshot()
 
-            # Parameter blocks must retain X/Z as parameters.  Converting them
-            # into coordinates would recreate the exact class of false moves the
-            # upstream parser carefully avoids.
+            # Parameter blocks must retain X/Z/U/W as parameters.  Converting
+            # them into coordinates would recreate the exact class of false
+            # moves the upstream parser carefully avoids.
             if any(g in NON_MOTION_CODES for g in g_codes):
                 out.append(code_line)
                 continue
 
             x_match = re.search(rf"X({NUMBER})", code_line, re.IGNORECASE)
             z_match = re.search(rf"Z({NUMBER})", code_line, re.IGNORECASE)
+            u_match = re.search(rf"U({NUMBER})", code_line, re.IGNORECASE)
+            w_match = re.search(rf"W({NUMBER})", code_line, re.IGNORECASE)
             # Normalization is parser-only, so comments are intentionally omitted
             # while line count is preserved.  This prevents an X/Z written inside
             # a comment from being replaced as if it were executable code.
             transformed = code_line
 
+            # X/U and Z/W are resolved independently.  As in the upstream parser,
+            # an explicit X or Z wins over its incremental U/W partner on the
+            # same block.
             if self.distance_mode == "G91":
                 if x_match:
                     self.x += float(x_match.group(1))
                     transformed = self._replace_axis(transformed, "X", self.x)
+                elif u_match:
+                    self.x += float(u_match.group(1))
+
                 if z_match:
                     self.z += float(z_match.group(1))
                     transformed = self._replace_axis(transformed, "Z", self.z)
+                elif w_match:
+                    self.z += float(w_match.group(1))
             else:
                 # Unknown mode is left geometrically compatible with the
                 # upstream absolute parser.  The safety validator blocks export
                 # until G90/G91 is explicit, so this fallback is for viewing only.
                 if x_match:
                     self.x = float(x_match.group(1))
+                elif u_match:
+                    self.x += float(u_match.group(1))
+
                 if z_match:
                     self.z = float(z_match.group(1))
+                elif w_match:
+                    self.z += float(w_match.group(1))
 
             out.append(transformed)
 
