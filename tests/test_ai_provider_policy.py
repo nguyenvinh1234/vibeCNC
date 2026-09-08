@@ -5,13 +5,19 @@ from unittest.mock import patch
 from vibe_cnc.claude_client import AIClient
 
 
-def make_settings(mode="anthropic", offline=False, profile="MACH3TURN_XHC_MKX_ET"):
+def make_settings(
+    mode="anthropic",
+    offline=False,
+    profile="MACH3TURN_XHC_MKX_ET",
+    allow_local=False,
+):
     return SimpleNamespace(
         data={
             "machine": {"profile": profile} if profile else {},
             "ai": {
                 "mode": mode,
                 "offline": offline,
+                "allow_local": allow_local,
                 "anthropic": {
                     "base_url": "https://example.invalid/v1/messages",
                     "api_key_env": "ANTHROPIC_API_KEY",
@@ -38,19 +44,28 @@ class AIProviderPolicyTests(unittest.TestCase):
         self.assertIn("disabled", message.lower())
         post.assert_not_called()
 
-    def test_production_profile_blocks_ollama_even_if_config_selects_it(self):
-        client = AIClient(make_settings(mode="ollama"))
+    def test_local_ai_is_disabled_by_default_on_current_cnc_config(self):
+        client = AIClient(make_settings(mode="ollama", allow_local=False))
 
         with patch("vibe_cnc.claude_client.requests.post") as post:
             ok, message = client.ask("review this")
 
         self.assertFalse(ok)
-        self.assertIn("disabled", message.lower())
+        self.assertIn("allow_local=false", message.lower())
         self.assertIn("ollama", message.lower())
         post.assert_not_called()
 
+    def test_local_ai_can_be_explicitly_enabled_on_same_mach3turn_profile(self):
+        client = AIClient(make_settings(mode="ollama", allow_local=True))
+
+        with patch.object(client, "ask_ollama", return_value=(True, "local-ok")) as local:
+            result = client.ask("review this")
+
+        self.assertEqual(result, (True, "local-ok"))
+        local.assert_called_once_with("review this")
+
     def test_unknown_provider_never_falls_back_to_ollama(self):
-        client = AIClient(make_settings(mode="unknown-cloud"))
+        client = AIClient(make_settings(mode="unknown-cloud", allow_local=True))
 
         with patch("vibe_cnc.claude_client.requests.post") as post:
             ok, message = client.ask("review this")
@@ -80,14 +95,15 @@ class AIProviderPolicyTests(unittest.TestCase):
         self.assertEqual(result, (True, "cloud-ok"))
         cloud.assert_called_once_with("review this")
 
-    def test_ollama_remains_available_only_outside_production_profile(self):
-        client = AIClient(make_settings(mode="ollama", profile=None))
+    def test_local_ai_requires_explicit_opt_in_even_outside_machine_profile(self):
+        client = AIClient(make_settings(mode="ollama", profile=None, allow_local=False))
 
         with patch.object(client, "ask_ollama", return_value=(True, "local-ok")) as local:
-            result = client.ask("review this")
+            ok, message = client.ask("review this")
 
-        self.assertEqual(result, (True, "local-ok"))
-        local.assert_called_once_with("review this")
+        self.assertFalse(ok)
+        self.assertIn("allow_local=false", message.lower())
+        local.assert_not_called()
 
 
 if __name__ == "__main__":
