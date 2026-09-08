@@ -58,16 +58,18 @@ policies:
   require_origin: G54
 
 ai:
-  # Upstream values remain documented for compatibility, but the Mach3Turn
-  # production plan does not run local/Ollama AI on the CNC PC.  The provider
-  # layer will replace this selector in V0.3 with Codex subscription/API cloud.
-  mode: ollama
-  offline: false
+  # Mach3Turn production starts with AI disabled. This prevents the weak CNC PC
+  # from trying to launch/use Ollama. V0.3 will replace this with cloud and
+  # subscription providers (Codex/ChatGPT, OpenAI API, Anthropic API).
+  mode: anthropic
+  offline: true
   anthropic:
     base_url: https://api.anthropic.com/v1/messages
     model: claude-sonnet-4-20250514
     api_key_env: ANTHROPIC_API_KEY
     max_output_tokens: 800
+  # Kept only for upstream compatibility; do not select this provider in the
+  # MACH3TURN_XHC_MKX_ET production profile.
   ollama:
     base_url: http://127.0.0.1:11434/api/chat
     model: granite3.3:8b
