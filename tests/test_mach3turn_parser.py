@@ -31,6 +31,22 @@ class Mach3TurnModalParserTests(unittest.TestCase):
         self.assertEqual(paths["cut"], [[(10.0, 5.0), (10.0, 3.0), 4]])
         self.assertAlmostEqual(parser.z, 3.0)
 
+    def test_u_w_update_position_before_next_g91_x_z(self):
+        parser = Mach3TurnGCodeParser(chuck_z=-1000.0)
+
+        paths = parser.parse("\n".join([
+            "G21 G18 G90 G94",
+            "G00 X10. Z5.",
+            "G91",
+            "G01 U2. W-1. F300",
+            "G01 X3. Z-2.",
+        ]))
+
+        self.assertEqual(paths["cut"][0][1], (12.0, 4.0))
+        self.assertEqual(paths["cut"][1][1], (15.0, 2.0))
+        self.assertAlmostEqual(parser.x, 15.0)
+        self.assertAlmostEqual(parser.z, 2.0)
+
     def test_g90_and_g91_do_not_produce_the_same_target(self):
         absolute = Mach3TurnGCodeParser(chuck_z=-1000.0).parse("\n".join([
             "G21 G18 G90 G94",
