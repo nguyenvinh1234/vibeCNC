@@ -35,13 +35,14 @@
 | Modal state G94/G95 | 🟡 | State được lưu; validator buộc khai báo rõ trước motion |
 | G40/G41/G42 state | 🟡 | Parser wrapper lưu compensation state; upstream vẫn xử lý TNR geometry |
 | X Diameter mode | 🟡 | Khóa trong machine profile; chưa nối UI/profile display |
-| Severity INFO/WARNING/ERROR/FATAL | 🟡 | `mach3turn_validator.py` + `safety_engine.py` |
+| Severity INFO/WARNING/ERROR/FATAL | 🟡 | `mach3turn_validator.py` + `safety_engine.py`; linter UI path cũng đã nhận severity |
 | `G0 10.` = FATAL | 🟡 | Rule `M3T-SYNTAX-001`; tuyệt đối không tự đoán X hay Z |
 | Export gate deterministic | 🟡 | `SafetyEngine.blocks_export()` chặn ERROR/FATAL; chưa nối nút export UI |
 | Parser compact words | 🟡 | Hỗ trợ dạng `G21G18G90G94`, `G1Z-8.5F300` |
 | U/W + G91 state | 🟡 | Wrapper cập nhật U/W trước các X/Z incremental tiếp theo |
+| UI nhận Mach3Turn validator qua LintEngine | 🟡 | `LintEngine` tự kích hoạt validator khi profile là `MACH3TURN_XHC_MKX_ET` |
 | UI dùng Mach3Turn parser | ⬜ CHƯA XONG | Plotter hiện vẫn dùng parser upstream trực tiếp |
-| UI dùng SafetyEngine | ⬜ CHƯA XONG | `vibe_cnc.py` vẫn đang gọi `LintEngine` upstream |
+| UI hiển thị severity riêng biệt | ⬜ CHƯA XONG | Data đã có severity; presentation chưa phân INFO/WARNING/ERROR/FATAL |
 | Nút/export production bị khóa khi blocking | ⬜ CHƯA XONG | Core gate đã có, UI integration chưa làm |
 
 ## C. Regression bằng chương trình máy thật
@@ -60,22 +61,28 @@
 
 | Hạng mục | Trạng thái | Ghi chú |
 |---|---|---|
-| Test Mach3Turn validator | 🟡 | Đã thêm `tests/test_mach3turn_validator.py` vào CI |
-| Test Mach3Turn parser | 🟡 | Đã thêm `tests/test_mach3turn_parser.py` vào CI |
-| Test chương trình thật | 🟡 | Đã thêm `tests/test_mach3turn_real_programs.py` vào CI |
-| Test SafetyEngine | 🟡 | Đã thêm `tests/test_safety_engine.py` vào CI |
-| GitHub Actions CI PASS | ⬜ CHƯA XONG | Hiện GitHub chưa tạo workflow run/status cho head branch; chưa được phép đánh dấu các mục 🟡 thành ✅ |
+| Test Mach3Turn validator | 🟡 | `tests/test_mach3turn_validator.py` đã có trong CI |
+| Test Mach3Turn parser | 🟡 | `tests/test_mach3turn_parser.py` đã có trong CI |
+| Test chương trình thật | 🟡 | `tests/test_mach3turn_real_programs.py` đã có trong CI |
+| Test SafetyEngine | 🟡 | `tests/test_safety_engine.py` đã có trong CI |
+| Test Mach3Turn → LintEngine integration | 🟡 | `tests/test_mach3turn_lint_integration.py` đã có trong CI |
+| Test cấm local AI production | 🟡 | `tests/test_ai_provider_policy.py`; offline/production Ollama/unknown-provider đều phải không tạo local/network fallback |
+| Workflow chạy trên `mach3turn` push | 🟡 | `ci.yml` đã thêm `mach3turn` vào trigger |
+| GitHub Actions CI PASS | ⬜ CHƯA XONG | GitHub vẫn chưa tạo workflow run/status cho branch; chưa được phép đổi các mục 🟡 thành ✅ |
 | Ruff PASS | ⬜ CHƯA XONG | Chờ GitHub Actions chạy |
 
 ## E. AI Cloud / Subscription
 
 | Hạng mục | Trạng thái | Ghi chú |
 |---|---|---|
+| Hard no-local guard trong `AIClient` | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | `offline: true` dừng ngay; profile production chặn Ollama; unknown mode không còn fallback Ollama |
+| Alias `anthropic`/`claude` → cloud Anthropic | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | Vá lỗi upstream: trước đây mọi mode khác `claude` đều rơi xuống Ollama |
+| AI mặc định production | 🟡 ĐÃ CODE, CHỜ KIỂM CHỨNG | `config.example.yaml` để `offline: true`; không tự gọi AI khi mới cài |
 | AI Provider abstraction | ⬜ CHƯA XONG | Làm sau khi P0 safety core được CI xác nhận |
 | Codex CLI / ChatGPT Plus-Pro | ⬜ CHƯA XONG | Provider ưu tiên số 1 |
-| OpenAI API key | ⬜ CHƯA XONG | API billing riêng; key chỉ từ env/credential store |
-| Anthropic API | ⬜ CHƯA XONG | Refactor client upstream |
-| Ollama/local model production | ⛔ KHÔNG LÀM | Máy CNC yếu; không tải local model |
+| OpenAI API key | ⬜ CHƯA XONG | Key chỉ từ env/credential store; không commit secret |
+| Anthropic API provider chuẩn hóa | ⬜ CHƯA XONG | Client cloud hiện có đã được khóa policy; interface provider chung chưa tách |
+| Ollama/local model production | ⛔ KHÔNG LÀM | Máy CNC yếu; hard guard chặn local AI ở production profile |
 | DeepSeek/OpenRouter | ⬜ P2 | Sau core |
 
 ## F. Tool/Turret và máy lận
@@ -92,13 +99,13 @@
 
 ## Checkpoint hiện tại
 
-**Đã hoàn thành phần viết code đầu tiên của P0 nhưng CHƯA công nhận V0.1 là XONG.** Lý do duy nhất: chưa có CI PASS/kiểm chứng toàn bộ upstream regression.
+**P0 safety core đã được viết ở mức module + regression tests, nhưng CHƯA công nhận V0.1 là XONG.** Hai điểm còn thiếu để chốt V0.1: (1) GitHub Actions/CI phải chạy và PASS toàn bộ upstream + test mới; (2) production export/UI phải thực sự dùng blocking gate, không chỉ có core function.
 
 ### Việc tiếp theo theo đúng thứ tự
 
-1. Làm cho GitHub Actions chạy trên PR #1 và lấy kết quả Core + GUI + Ruff.
+1. Bật/khôi phục GitHub Actions cho fork và lấy kết quả Core + GUI/runtime + Ruff.
 2. Nếu CI đỏ: sửa đến khi toàn bộ PASS.
-3. Nối `SafetyEngine` vào `vibe_cnc.py`, hiển thị severity rõ trong lint pane.
-4. Nối `Mach3TurnGCodeParser` vào X-Z plotter khi profile là `MACH3TURN_XHC_MKX_ET`.
+3. Nối `Mach3TurnGCodeParser` vào X-Z plotter khi profile là `MACH3TURN_XHC_MKX_ET`.
+4. Hiển thị severity rõ trong UI: INFO/WARNING/ERROR/FATAL.
 5. Thêm production Export Gate: ERROR/FATAL = không cho xuất `.tap/.nc`.
 6. Sau khi P0 PASS mới chuyển sang V0.2 tool/turret safety.
