@@ -5,40 +5,37 @@ from typing import Tuple
 import requests
 
 
-MACH3TURN_PRODUCTION_PROFILE = "MACH3TURN_XHC_MKX_ET"
-
-
 class AIClient:
     def __init__(self, settings):
         self.cfg = settings.data
 
     def ask(self, prompt: str) -> Tuple[bool, str]:
-        """Main ask method with an explicit no-local production policy.
+        """Main ask method with explicit provider selection and no silent fallback.
 
-        The Mach3Turn/XHC production profile runs on a weak CNC PC. Local AI is
-        therefore forbidden even if an old config accidentally still selects
-        Ollama. Unknown modes are rejected instead of silently falling back to a
-        local provider.
+        The current CNC PC is weak, so local AI is disabled by default through
+        ``ai.allow_local: false``.  This is a deployment default, not a permanent
+        ban: a future machine with sufficient CPU/GPU/RAM may explicitly enable
+        local Ollama without changing the Mach3Turn machine profile.
         """
         ai_cfg = self.cfg.get("ai", {})
 
         if ai_cfg.get("offline", False):
             return (
                 False,
-                "AI is disabled in this profile. Select a cloud/subscription provider when available.",
+                "AI is disabled by ai.offline=true. Enable AI and select a provider to use it.",
             )
 
         mode = str(ai_cfg.get("mode", "anthropic")).strip().lower()
-        profile_id = self.cfg.get("machine", {}).get("profile")
 
         if mode in ("claude", "anthropic"):
             return self.ask_claude(prompt)
 
         if mode == "ollama":
-            if profile_id == MACH3TURN_PRODUCTION_PROFILE:
+            if not bool(ai_cfg.get("allow_local", False)):
                 return (
                     False,
-                    "Local AI/Ollama is disabled for MACH3TURN_XHC_MKX_ET production profile.",
+                    "Local AI/Ollama is disabled by ai.allow_local=false. "
+                    "Enable it only on a machine with sufficient resources.",
                 )
             return self.ask_ollama(prompt)
 
@@ -56,14 +53,12 @@ class AIClient:
                 anthropic.get("api_key_env", "ANTHROPIC_API_KEY"), ""
             )
 
-            # Validate API key
             if not api_key or api_key.strip() == "":
                 return (
                     False,
                     "ANTHROPIC_API_KEY is not set. Configure the environment variable before using Anthropic API.",
                 )
 
-            # Validate base URL
             base_url = anthropic.get("base_url", "")
             if not base_url:
                 return (False, "config.yaml invalid: ai.anthropic.base_url missing")
@@ -80,7 +75,6 @@ class AIClient:
                 "messages": [{"role": "user", "content": prompt}],
             }
 
-            # Make API request with timeout
             try:
                 response = requests.post(
                     base_url,
@@ -117,13 +111,11 @@ class AIClient:
                     f"Claude API HTTP {response.status_code}: {error_msg}",
                 )
 
-            # Parse response
             try:
                 payload = response.json()
             except json.JSONDecodeError:
                 return (False, "Claude API: Invalid JSON response")
 
-            # Extract text content
             parts = payload.get("content", [])
             text_parts = []
             for part in parts:
@@ -143,9 +135,9 @@ class AIClient:
         except Exception as exc:
             return (False, f"Unexpected error: {type(exc).__name__}: {str(exc)}")
 
-    # ---- Ollama (local; upstream compatibility only) ----
+    # ---- Ollama (optional local provider) ----
     def ask_ollama(self, prompt: str) -> Tuple[bool, str]:
-        """Ask Ollama API. Production Mach3Turn profile cannot reach this method."""
+        """Ask Ollama API when local AI has been explicitly enabled."""
         try:
             ollama = self.cfg["ai"]["ollama"]
             base_url = ollama.get("base_url", "")
